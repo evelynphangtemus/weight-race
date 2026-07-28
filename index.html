@@ -183,8 +183,25 @@
       </div>
     </div>
 
+    <!-- edit targets only -->
+    <div id="editTargetsCard" class="card hidden">
+      <h3 style="margin-top:0">🎯 Edit target weights</h3>
+      <p class="note" style="margin-top:0">Only the 1 Oct targets change — your start weights and start date stay exactly as they are.</p>
+      <div class="grid2">
+        <div><label>💗 Evelyn — new target (kg)</label><input id="et_ev" type="number" step="0.1" /></div>
+        <div><label>💙 Damian — new target (kg)</label><input id="et_dm" type="number" step="0.1" /></div>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:10px">
+        <button onclick="saveTargets()">Save targets</button>
+        <button class="ghost" onclick="$('editTargetsCard').classList.add('hidden')">Cancel</button>
+      </div>
+      <div id="editTargetsMsg" class="note"></div>
+    </div>
+
     <div class="center note" style="margin-bottom:30px">
-      <a href="#" onclick="if(confirm('Reset all setup (targets/start weights)? Daily entries are kept.')){resetSetup()}return false">Reset targets</a>
+      <a href="#" onclick="openEditTargets();return false">🎯 Edit target weights</a>
+      &nbsp;·&nbsp;
+      <a href="#" onclick="if(confirm('Reset ALL setup — both start AND target weights? Daily entries are kept.')){resetSetup()}return false">Reset all setup</a>
     </div>
   </div>
 </div>
@@ -279,6 +296,30 @@ async function saveSetup(){
 }
 async function resetSetup(){
   await sb.from('settings').delete().in('person',PEOPLE);
+  await refresh();
+}
+function openEditTargets(){
+  $("et_ev").value = settings["Evelyn"] ? settings["Evelyn"].target_weight : "";
+  $("et_dm").value = settings["Damian"] ? settings["Damian"].target_weight : "";
+  $("editTargetsMsg").textContent = "";
+  $("editTargetsCard").classList.remove("hidden");
+  $("editTargetsCard").scrollIntoView({behavior:"smooth", block:"center"});
+}
+async function saveTargets(){
+  const evT = parseFloat($("et_ev").value), dmT = parseFloat($("et_dm").value);
+  if(isNaN(evT) || isNaN(dmT)){ $("editTargetsMsg").innerHTML='<span class="err">Enter both target weights.</span>'; return; }
+  $("editTargetsMsg").textContent = "Saving…";
+  // keep existing start_weight + start_date, only change target_weight
+  const rows = PEOPLE.map(p => ({
+    person: p,
+    start_weight: settings[p].start_weight,
+    start_date: settings[p].start_date,
+    target_weight: p==="Evelyn" ? evT : dmT
+  }));
+  const {error} = await sb.from('settings').upsert(rows, {onConflict:'person'});
+  if(error){ $("editTargetsMsg").innerHTML='<span class="err">'+error.message+'</span>'; return; }
+  $("editTargetsMsg").innerHTML='<span class="ok">Targets updated! 🎯</span>';
+  $("editTargetsCard").classList.add("hidden");
   await refresh();
 }
 
